@@ -132,6 +132,29 @@ if __name__ == "__main__":
         p_o_b = Pose(cam_pos, cam_orientation)
         vel_cmd = vel_regressor.predict_velocities(img_batch_1, p_o_b)
         move_drone(client, vel_cmd)
+        
+        # 获取并打印无人机的状态，包括合速度，分方向速度以及每个时刻的无人机位姿角度以及钻过框数量统计
+        linear_velocity = client.getMultirotorState(vehicle_name=drone_name).kinematics_estimated.linear_velocity
+        speed = math.sqrt(linear_velocity.x_val ** 2 + linear_velocity.y_val ** 2 + linear_velocity.z_val ** 2)
+        drone_orientation = client.getMultirotorState(vehicle_name=drone_name).kinematics_estimated.orientation
+        yaw, pitch, roll = airsim.to_eularian_angles(drone_orientation)
+        drone_position = client.getMultirotorState(vehicle_name=drone_name).kinematics_estimated.position
+        print("整体速度：", speed)
+        print("分方向速度：", linear_velocity)
+        print("转向角度(yaw, pitch, roll)：", yaw, pitch, roll)
+
+        for gate_pose in gate_poses:
+            gate_position = gate_pose.position
+            distance = math.sqrt(
+                (drone_position.x_val - gate_position.x_val) ** 2 +
+                (drone_position.y_val - gate_position.y_val) ** 2 +
+                (drone_position.z_val - gate_position.z_val) ** 2)
+            if distance < threshold:
+                gates_passed += 1
+                gate_poses.remove(gate_pose)
+                break
+        print("已钻过的门数：", gates_passed)
+        
         elapsed_time_loop = time.time() - start_time
         times_loop[count] = elapsed_time_loop
         count = count + 1
